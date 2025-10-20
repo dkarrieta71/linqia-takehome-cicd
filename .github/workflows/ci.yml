@@ -104,10 +104,26 @@ jobs:
             - name: Compute image metadata
               id: meta
               run: |
-                  REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-                  echo "imagename=ghcr.io/${REPO_LOWER}" >> $GITHUB_OUTPUT
-                  echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-                  echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+                # image name (must be lowercase)
+                REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+                echo "imagename=ghcr.io/${REPO_LOWER}" >> $GITHUB_OUTPUT
+
+                # derive a tag:
+                # - for PRs: use the source branch name (head.ref)
+                # - otherwise: use the ref_name
+                if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    RAW_TAG="${{ github.event.pull_request.head.ref }}"
+                else
+                    RAW_TAG="${{ github.ref_name }}"
+                fi
+
+                # sanitize: only [a-z0-9_.-] allowed, replace others (incl /) with '-'
+                SAFE_TAG=$(echo "$RAW_TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')
+                # optional: truncate to 120 chars to leave room for suffixes
+                SAFE_TAG=${SAFE_TAG:0:120}
+
+                echo "tag=$SAFE_TAG" >> $GITHUB_OUTPUT
+                echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
 
             - name: Build and Push
               uses: docker/build-push-action@v6
@@ -115,7 +131,7 @@ jobs:
                   context: .
                   push: true
                   tags: |
-                      ${{ steps.meta.outputs.imagename }}:${{ steps.meta.outputs.branch }}
+                      ${{ steps.meta.outputs.imagename }}:${{ steps.meta.outputs.tag }}
                       ${{ steps.meta.outputs.imagename }}:${{ steps.meta.outputs.sha }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
