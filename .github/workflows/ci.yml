@@ -106,24 +106,25 @@ jobs:
               run: |
                 # image name (must be lowercase)
                 REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-                echo "imagename=ghcr.io/${REPO_LOWER}" >> $GITHUB_OUTPUT
-
-                # derive a tag:
-                # - for PRs: use the source branch name (head.ref)
-                # - otherwise: use the ref_name
+                IMAGENAME="ghcr.io/${REPO_LOWER}"
+            
+                # raw ref: use PR source branch for pull_request, otherwise ref_name
                 if [ "${{ github.event_name }}" = "pull_request" ]; then
-                    RAW_TAG="${{ github.event.pull_request.head.ref }}"
+                  RAW="${{ github.event.pull_request.head.ref }}"
                 else
-                    RAW_TAG="${{ github.ref_name }}"
+                  RAW="${{ github.ref_name }}"
                 fi
-
-                # sanitize: only [a-z0-9_.-] allowed, replace others (incl /) with '-'
-                SAFE_TAG=$(echo "$RAW_TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')
-                # optional: truncate to 120 chars to leave room for suffixes
-                SAFE_TAG=${SAFE_TAG:0:120}
-
-                echo "tag=$SAFE_TAG" >> $GITHUB_OUTPUT
-                echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+            
+                # sanitize to allowed tag chars [a-z0-9._-]
+                SAFE=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')
+            
+                # fallback to sha if somehow empty
+                TAG=${SAFE:-${{ github.sha }}}
+            
+                echo "imagename=$IMAGENAME" >> $GITHUB_OUTPUT
+                echo "tag=$TAG" >> $GITHUB_OUTPUT
+                echo "image_tagged=$IMAGENAME:$TAG" >> $GITHUB_OUTPUT
+                echo "image_sha=$IMAGENAME:${{ github.sha }}" >> $GITHUB_OUTPUT
 
             - name: Build and Push
               uses: docker/build-push-action@v6
@@ -131,8 +132,8 @@ jobs:
                   context: .
                   push: true
                   tags: |
-                      ${{ steps.meta.outputs.imagename }}:${{ steps.meta.outputs.tag }}
-                      ${{ steps.meta.outputs.imagename }}:${{ steps.meta.outputs.sha }}
+                      ${{ steps.meta.outputs.image_tagged }}
+                      ${{ steps.meta.outputs.image_sha }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -140,7 +141,7 @@ jobs:
             - name: Trivy scan (critical/high fail)
               uses: aquasecurity/trivy-action@0.24.0
               with:
-                  image-ref: ${{ steps.meta.outputs.imagename }}:${{ steps.meta.outputs.branch }}
+                  image-ref: ${{ steps.meta.outputs.image_tagged }}
                   format: table
                   vuln-type: "os,library"
                   severity: "CRITICAL,HIGH"

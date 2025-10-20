@@ -25,9 +25,8 @@ jobs:
           HEAD_BRANCH=$(jq -r '.workflow_run.head_branch' "$GITHUB_EVENT_PATH")
           REPO_FULL=$(jq -r '.repository.full_name' "$GITHUB_EVENT_PATH" | tr '[:upper:]' '[:lower:]')
           SAFE_TAG=$(echo "$HEAD_BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')
-          SAFE_TAG=${SAFE_TAG:0:120}
+          SAFE_TAG=${SAFE_TAG:-${GITHUB_SHA}}
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
           echo "repo=$REPO_FULL" >> $GITHUB_OUTPUT
           echo "safe_tag=$SAFE_TAG" >> $GITHUB_OUTPUT
 
@@ -45,9 +44,9 @@ jobs:
       - name: Pull image
         id: pull
         run: |
-          IMAGE="ghcr.io/${{ steps.pr.outputs.repo }}:${{ steps.pr.outputs.safe_tag }}"
-          echo "image=$IMAGE" >> $GITHUB_OUTPUT
-          docker pull "$IMAGE"
+            IMAGE="ghcr.io/${{ steps.pr.outputs.repo }}:${{ steps.pr.outputs.safe_tag }}"
+            echo "image=$IMAGE" >> $GITHUB_OUTPUT
+            docker pull "$IMAGE"
 
       - name: Mock deploy (docker run)
         id: runapp
