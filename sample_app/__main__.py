@@ -1,6 +1,7 @@
 import sys
 from .functions import add
 
+
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
@@ -18,6 +19,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(add(a, b))
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
