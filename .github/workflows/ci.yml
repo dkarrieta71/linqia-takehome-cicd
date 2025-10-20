@@ -45,9 +45,14 @@ jobs:
 
             - name: Run tests with coverage (xml + text)
               run: |
-                  coverage run -m pytest -q --junitxml=junit.xml
-                  coverage xml -o coverage.xml
-                  coverage report | tee coverage.txt
+                    pytest -q \
+                        --junitxml=junit.xml \
+                        --cov=sample_app \
+                        --cov-report=term-missing:skip-covered \
+                        --cov-report=xml \
+                        --cov-report=html \
+                        --cov-fail-under=90
+                    coverage report | tee coverage.txt
 
             - name: Enforce coverage threshold (90%)
               id: covgate
@@ -73,7 +78,7 @@ jobs:
                       junit.xml
                       coverage.xml
                       coverage.txt
-                      pytest-raw.txt
+                      htmlcov/
 
     # --- Build & Push Docker image (only once, not per matrix) ---
     build-and-push:
